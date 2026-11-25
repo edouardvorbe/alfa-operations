@@ -235,12 +235,16 @@ export async function route() {
 window.addEventListener("hashchange", route);
 
 export async function boot() {
+  // Lien de réinitialisation de mot de passe (Supabase ajoute #access_token=…&type=recovery à l'URL)
+  const recovering = /type=recovery/.test(location.hash) || /error=/.test(location.hash);
+  const authErr = (location.hash.match(/error_description=([^&]+)/) || [])[1];
   try {
     const me = await api.init();
     state.me = me && me.active && me.role ? me : null;
     if (me && !(me.active && me.role)) { await api.signOut(); renderLogin("Ce compte n'est pas autorisé à utiliser l'application."); return; }
   } catch (e) { console.error(e); renderLogin("Impossible de joindre le serveur : " + e.message); return; }
-  if (location.hash.includes("type=recovery")) location.hash = "#/compte";
+  if (authErr) { renderLogin("Le lien n'est plus valide (" + decodeURIComponent(authErr.replace(/\+/g, " ")) + "). Cliquez sur « Mot de passe oublié ? » pour en recevoir un nouveau."); return; }
+  if (recovering && state.me) { location.hash = "#/compte"; setTimeout(() => toast("Choisissez maintenant votre nouveau mot de passe."), 300); }
   renderShellIfNeeded(); await route();
 }
 function renderShellIfNeeded() { if (state.me) renderShell(); }

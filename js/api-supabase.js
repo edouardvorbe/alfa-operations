@@ -34,7 +34,7 @@ export function createSupabaseApi(cfg) {
     },
     async signOut() { await sb.auth.signOut(); me = null; },
     async resetPassword(email) {
-      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname + "#/compte" });
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
       if (error) err(error);
     },
     async updatePassword(password) {
