@@ -24,7 +24,13 @@ export function createSupabaseApi(cfg) {
       return loadProfile(session?.user || null);
     },
     onAuthChange(cb) {
-      sb.auth.onAuthStateChange(async (_evt, session) => { cb(await loadProfile(session?.user || null)); });
+      // Important : ne jamais appeler Supabase directement dans ce callback (verrou interne → blocage).
+      // On diffère le travail avec setTimeout pour sortir du verrou.
+      sb.auth.onAuthStateChange((_evt, session) => {
+        setTimeout(async () => {
+          try { cb(await loadProfile(session?.user || null)); } catch (e) { console.error(e); }
+        }, 0);
+      });
     },
     me() { return me; },
     async signIn(email, password) {

@@ -239,7 +239,8 @@ export async function boot() {
   const recovering = /type=recovery/.test(location.hash) || /error=/.test(location.hash);
   const authErr = (location.hash.match(/error_description=([^&]+)/) || [])[1];
   try {
-    const me = await api.init();
+    // Garde-fou : si le serveur ne répond pas en 20 s, on affiche l'écran de connexion au lieu de rester sur « Chargement… »
+    const me = await Promise.race([api.init(), new Promise((_, rej) => setTimeout(() => rej(new Error("délai dépassé — rechargez la page")), 20000))]);
     state.me = me && me.active && me.role ? me : null;
     if (me && !(me.active && me.role)) { await api.signOut(); renderLogin("Ce compte n'est pas autorisé à utiliser l'application."); return; }
   } catch (e) { console.error(e); renderLogin("Impossible de joindre le serveur : " + e.message); return; }
