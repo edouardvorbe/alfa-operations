@@ -52,6 +52,10 @@ body.on-map .topbar{background:linear-gradient(180deg,rgba(4,20,32,.94),rgba(4,2
 .topbar .spacer{display:none}
 .topbar .user{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--glass-dim);padding-left:10px;margin-left:4px;border-left:1px solid rgba(255,255,255,.14)}
 .topbar .user b{color:#fff;font-weight:700}
+.topbar .user .nm{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:1400px){.topbar .user span.nm{display:none}.top-gauge{max-width:240px}}
+@media (max-width:1180px){.topbar .brand h1 small{display:none}.topbar nav a,.topbar .user .btn{padding:7px 10px;font-size:12px}.top-gauge{max-width:170px}}
+@media (max-width:1040px){.top-gauge{display:none}}
 .topbar .user .role{background:rgba(0,163,224,.22);color:#9FDBF5;padding:2px 8px;border-radius:999px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;font-weight:800}
 .burger{display:none;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:18px;cursor:pointer;border-radius:8px;width:38px;height:36px}
 #view{padding-top:var(--top-h)}
