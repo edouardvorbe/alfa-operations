@@ -15,9 +15,20 @@ export const deptColor = d => CFG.deptColors[d] || "#777";
 export async function loadStations(force = false) {
   if (state.stations && !force) return state.stations;
   state.stations = await api.listStations();
+  updateGauge();
   return state.stations;
 }
 export const isDone = s => !!s.has_fiche;
+
+// Jauge d'avancement dans la barre du haut (surveys disponibles / stations actives)
+export function updateGauge() {
+  const fill = $("#gaugeFill"), label = $("#gaugeLabel");
+  if (!fill || !state.stations) return;
+  const act = state.stations.filter(s => s.status === "active"), done = act.filter(isDone).length;
+  fill.style.width = (act.length ? Math.round(done / act.length * 100) : 0) + "%";
+  label.textContent = `${done} / ${act.length} surveys`;
+  label.title = `${done} station(s) avec fiche de survey sur ${act.length}`;
+}
 
 // ---------------------------------------------------------------- coquille
 function renderShell() {
@@ -26,39 +37,47 @@ function renderShell() {
   app.innerHTML = `
   <header class="topbar">
     <button class="burger" id="burger" aria-label="Menu">☰</button>
-    <a class="brand" href="#/"><span class="logo">A</span><span>${esc(CFG.appName)}<small>${esc(CFG.company)} · suivi des surveys</small></span></a>
+    <a class="brand" href="#/" title="${esc(CFG.company)}"><img src="img/alfa-wordmark-white.png" alt="ALFA"><span class="sep"></span><h1>Operations<small>${esc(CFG.tagline || "Réseau stations · Suivi des surveys")}</small></h1></a>
+    <div class="top-gauge" title="Avancement des surveys"><div class="tg-bar"><div class="tg-fill" id="gaugeFill"></div></div><div class="tg-label" id="gaugeLabel">— / —</div></div>
     <nav id="nav">
       <a href="#/" data-r="/">Carte</a>
       <a href="#/liste" data-r="/liste">Stations</a>
       <a href="#/a-faire" data-r="/a-faire">Surveys à faire</a>
       ${can.admin() ? '<a href="#/admin" data-r="/admin">Administration</a>' : ""}
     </nav>
-    <div class="spacer"></div>
     <div class="user"><span class="nm"><b>${esc(me.full_name || me.email)}</b></span><span class="role">${esc(me.role)}</span>
-      <a href="#/compte" class="btn sm ghost" style="color:#fff">Mon compte</a>
-      <button class="btn sm ghost" id="logout" style="color:#fff">Déconnexion</button></div>
+      <a href="#/compte" class="btn sm">Mon compte</a>
+      <button class="btn sm" id="logout">Déconnexion</button></div>
   </header>
   <main id="view"></main>`;
-  $("#logout").onclick = async () => { await api.signOut(); state.me = null; location.hash = "#/login"; };
+  $("#logout").onclick = async () => { await api.signOut(); state.me = null; document.body.classList.remove("on-map"); location.hash = "#/login"; };
   $("#burger").onclick = () => $("#nav").classList.toggle("open");
+  updateGauge();
 }
 function setActiveNav(path) {
   $$("#nav a").forEach(a => a.classList.toggle("active", a.dataset.r === "/" ? path === "/" : path.startsWith(a.dataset.r)));
   $("#nav")?.classList.remove("open");
+  document.body.classList.toggle("on-map", path === "/");
 }
 
 // ---------------------------------------------------------------- login
 function renderLogin(msg) {
+  document.body.classList.remove("on-map");
   $("#app").innerHTML = `
-  <div class="login"><form class="box" id="loginForm">
-    <div class="row" style="margin-bottom:14px"><span class="logo" style="width:36px;height:36px;border-radius:9px;background:var(--brand);color:#fff;display:grid;place-items:center;font-weight:800">A</span><div><h1>${esc(CFG.appName)}</h1><p class="sub" style="margin:0">${esc(CFG.company)} · Suivi des surveys et du rebranding</p></div></div>
-    ${msg ? `<div class="warnbox" style="margin-bottom:12px">${esc(msg)}</div>` : ""}
-    <div class="field"><label>E-mail</label><input type="email" id="email" autocomplete="username" required></div>
-    <div class="field"><label>Mot de passe</label><input type="password" id="pw" autocomplete="current-password" required></div>
-    <div class="err" id="err" hidden></div>
-    <button class="btn primary" style="width:100%;justify-content:center" type="submit">Se connecter</button>
-    <p class="small muted" style="margin:14px 0 0"><a href="#" id="forgot">Mot de passe oublié ?</a>${api.mode === "mock" ? " · <span>Mode essai : admin@alfa.ht / demo</span>" : ""}</p>
-  </form></div>`;
+  <div class="login"><div class="cover">
+    <img src="img/alfa-wordmark-white.png" alt="ALFA">
+    <div class="sub">Operations · Réseau stations</div>
+    <form class="box" id="loginForm">
+      <h1>Connexion</h1><p class="sub">Suivi des surveys et du rebranding — ${esc(CFG.company)}</p>
+      ${msg ? `<div class="warnbox" style="margin-bottom:12px">${esc(msg)}</div>` : ""}
+      <div class="field"><label>E-mail</label><input type="email" id="email" autocomplete="username" required></div>
+      <div class="field"><label>Mot de passe</label><input type="password" id="pw" autocomplete="current-password" required></div>
+      <div class="err" id="err" hidden></div>
+      <button class="btn primary" style="width:100%;justify-content:center;padding:11px" type="submit">Se connecter</button>
+      <p class="small muted" style="margin:14px 0 0"><a href="#" id="forgot">Mot de passe oublié ?</a>${api.mode === "mock" ? " · <span>Mode essai : admin@alfa.ht / demo</span>" : ""}</p>
+    </form>
+    <div class="foot">Accès réservé · ${esc(CFG.company)}</div>
+  </div></div>`;
   $("#loginForm").onsubmit = async e => {
     e.preventDefault(); const err = $("#err"); err.hidden = true;
     try {
@@ -87,52 +106,100 @@ function stationFilter(s) {
   if (f.company && (s.company || "") !== f.company) return false;
   return true;
 }
+const PUMP_SVG = '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 3h8a1.5 1.5 0 0 1 1.5 1.5V20H16v-7h1.2V8.1l-1.9-1.9 1.1-1.1 3.1 3.1c.3.3.5.7.5 1.1v8.2a2 2 0 0 1-4 0V16h-1.5v4H16v2H3v-2h.5V4.5A1.5 1.5 0 0 1 5 3zm1.5 2.5v4.5h5V5.5h-5z"/></svg>';
+let sideOpen = true, baseName = "sat";
 async function renderMap(view) {
   const stations = (await loadStations()).filter(s => s.status === "active");
   const done = stations.filter(isDone).length;
   const companies = [...new Set([...CFG.companies, ...stations.map(s => s.company).filter(Boolean)])];
-  view.innerHTML = `<div class="page wide"><div class="mapwrap">
-    <aside class="side">
-      <div class="kpis"><div><b>${stations.length}</b><span>Stations</span></div><div><b>${done}</b><span>Avec survey</span></div><div><b>${stations.length - done}</b><span>Restantes</span></div></div>
-      <div class="filters">
-        <input class="full" id="fq" placeholder="Rechercher une station…" value="${esc(state.filters.q)}">
-        <select id="fdept"><option value="">Tous départements</option>${CFG.depts.map(d => `<option value="${d}" ${state.filters.dept === d ? "selected" : ""}>${deptLabel(d)}</option>`).join("")}</select>
-        <select id="flevel"><option value="">Tous niveaux</option>${CFG.levels.map(l => `<option ${state.filters.level === l ? "selected" : ""}>${l}</option>`).join("")}</select>
-        <select id="fgrp"><option value="">Actives + blanches</option><option value="actives" ${state.filters.grp === "actives" ? "selected" : ""}>Actives</option><option value="blanches" ${state.filters.grp === "blanches" ? "selected" : ""}>Blanches</option></select>
-        <select id="fsurvey"><option value="">Survey : tous</option><option value="done" ${state.filters.survey === "done" ? "selected" : ""}>Avec survey</option><option value="todo" ${state.filters.survey === "todo" ? "selected" : ""}>Sans survey</option></select>
-        <select class="full" id="fcompany"><option value="">Toutes compagnies</option>${companies.map(c => `<option ${state.filters.company === c ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
+  const f = state.filters;
+  view.innerHTML = `<div class="page wide">
+    <div id="map"></div>
+    <aside class="side ${sideOpen ? "" : "hidden"}" id="side">
+      <div class="side-head"><div class="stats">
+        <div class="stat"><b>${stations.length}</b><span>Stations</span></div>
+        <div class="stat s-ok"><b>${done}</b><span>Avec survey</span></div>
+        <div class="stat s-no"><b>${stations.length - done}</b><span>Restantes</span></div>
+      </div></div>
+      <div class="side-filters">
+        <input type="search" id="fq" placeholder="Rechercher une station, une ville…" value="${esc(f.q)}">
+        <div class="filter-row">
+          <select id="fdept"><option value="">Département</option>${CFG.depts.map(d => `<option value="${d}" ${f.dept === d ? "selected" : ""}>${deptLabel(d)}</option>`).join("")}</select>
+          <select id="flevel"><option value="">Niveau</option>${CFG.levels.map(l => `<option ${f.level === l ? "selected" : ""}>${l}</option>`).join("")}</select>
+        </div>
+        <div class="filter-row">
+          <select id="fsurvey"><option value="">Survey</option><option value="done" ${f.survey === "done" ? "selected" : ""}>Avec survey</option><option value="todo" ${f.survey === "todo" ? "selected" : ""}>À faire</option></select>
+          <select id="fcompany"><option value="">Compagnie</option>${companies.map(c => `<option ${f.company === c ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
+        </div>
+        <div class="chiprow">
+          <button class="chip ${f.grp === "" ? "on" : ""}" data-grp="">Toutes</button>
+          <button class="chip ${f.grp === "actives" ? "on" : ""}" data-grp="actives">Actives</button>
+          <button class="chip ${f.grp === "blanches" ? "on" : ""}" data-grp="blanches">Blanches</button>
+        </div>
+        <div class="legend"><span><i class="ldot g"></i>Survey disponible</span><span><i class="ldot r"></i>À faire</span><span class="count" id="countLine"></span></div>
       </div>
-      <div class="list" id="slist"></div>
+      <div class="side-list" id="slist"></div>
     </aside>
-    <div id="map"></div></div></div>`;
+    <button class="side-toggle ${sideOpen ? "" : "show"}" id="sideToggle">☰ Stations</button>
+    <div class="basemaps">
+      <button data-bm="sat" class="${baseName === "sat" ? "on" : ""}">Satellite</button>
+      <button data-bm="plan" class="${baseName === "plan" ? "on" : ""}">Plan</button>
+      <button data-bm="dark" class="${baseName === "dark" ? "on" : ""}">Sombre</button>
+    </div>
+  </div>`;
   const bind = (id, key) => { $(id).oninput = e => { state.filters[key] = e.target.value; refresh(); }; };
-  bind("#fq", "q"); bind("#fdept", "dept"); bind("#flevel", "level"); bind("#fgrp", "grp"); bind("#fsurvey", "survey"); bind("#fcompany", "company");
+  bind("#fq", "q"); bind("#fdept", "dept"); bind("#flevel", "level"); bind("#fsurvey", "survey"); bind("#fcompany", "company");
+  $$(".chip").forEach(c => c.onclick = () => { state.filters.grp = c.dataset.grp; $$(".chip").forEach(x => x.classList.toggle("on", x === c)); refresh(); });
+  const toggleSide = () => { sideOpen = !sideOpen; $("#side").classList.toggle("hidden", !sideOpen); const mobile = window.innerWidth <= 900; $("#sideToggle").classList.toggle("show", !sideOpen || mobile); $("#sideToggle").textContent = sideOpen && mobile ? "✕ Fermer la liste" : "☰ Stations"; };
+  $("#sideToggle").onclick = toggleSide;
+  if (window.innerWidth <= 900) { $("#sideToggle").classList.add("show"); if (sideOpen) $("#sideToggle").textContent = "✕ Fermer la liste"; }
 
-  map = L.map("map", { zoomControl: true }).setView([19.0, -72.8], 8);
-  const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Esri" });
-  const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" });
-  const lbl = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19 });
-  sat.addTo(map); lbl.addTo(map);
-  L.control.layers({ "Satellite": sat, "Plan": osm }, { "Noms de lieux": lbl }, { position: "bottomright" }).addTo(map);
+  map = L.map("map", { zoomControl: false, minZoom: 5, maxZoom: 19 }).setView([18.95, -72.85], 8);
+  L.control.zoom({ position: "bottomleft" }).addTo(map);
+  const bases = {
+    sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, attribution: "Imagerie © Esri, Maxar, Earthstar Geographics" }),
+    plan: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }),
+    dark: L.tileLayer("https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap, © CARTO" })
+  };
+  const labels = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, pane: "shadowPane" });
+  let current = bases[baseName].addTo(map); if (baseName === "sat") labels.addTo(map);
+  $$(".basemaps button").forEach(b => b.onclick = () => {
+    const k = b.dataset.bm; if (k === baseName) return;
+    map.removeLayer(current); if (map.hasLayer(labels)) map.removeLayer(labels);
+    baseName = k; current = bases[k].addTo(map); if (k === "sat") labels.addTo(map);
+    $$(".basemaps button").forEach(x => x.classList.toggle("on", x === b));
+  });
   markersLayer = L.layerGroup().addTo(map);
 
+  function markerFor(s, lat, lon) {
+    const ok = isDone(s);
+    const icon = L.divIcon({ className: "", html: `<div class="mkg ${ok ? "ok" : "no"}${s.pilot ? " pilot" : ""}"><div class="box">${PUMP_SVG}</div></div>`, iconSize: [34, 44], iconAnchor: [17, 42], tooltipAnchor: [0, -36] });
+    const m = L.marker([lat, lon], { icon, keyboard: false });
+    m.bindTooltip(`${esc(s.name)}<small>${esc(s.city || "")} · ${deptLabel(s.dept)} · ${esc(s.level || "—")} · ${ok ? "survey disponible" : "survey à faire"}${s.coord_source && /approx/.test(s.coord_source) ? " · position approximative" : ""}</small>`, { className: "station-tip", direction: "top", opacity: 1 });
+    m.on("click", () => { location.hash = "#/station/" + s.id; });
+    return m;
+  }
   function refresh() {
     const list = stations.filter(stationFilter);
     const sl = $("#slist"); sl.innerHTML = "";
     markersLayer.clearLayers();
+    // regroupe les stations partageant la même position (ville approximative) et les écarte en anneau
+    const groups = {};
+    list.forEach(s => { if (s.lat == null || s.lon == null) return; const k = s.lat.toFixed(3) + "," + s.lon.toFixed(3); (groups[k] = groups[k] || []).push(s); });
+    Object.values(groups).forEach(members => members.forEach((s, i) => {
+      let lat = s.lat, lon = s.lon;
+      if (members.length > 1) { const ring = Math.floor(i / 8) + 1, slot = i % 8, r = 0.0045 * ring; lat += r * Math.cos(slot * Math.PI / 4); lon += r * Math.sin(slot * Math.PI / 4) * 1.06; }
+      markersLayer.addLayer(markerFor(s, lat, lon));
+    }));
     list.forEach(s => {
       const ok = isDone(s);
-      sl.appendChild(el(`<div class="srow" data-id="${s.id}"><span class="dot" style="background:${deptColor(s.dept)}"></span>
-        <div class="grow"><div class="nm">${esc(s.name)}</div><div class="sub">${esc(s.city || "—")} · ${deptLabel(s.dept)} · ${esc(s.level || "—")}${s.pilot ? " · Pilote" : ""}</div></div>
-        <span class="pill ${ok ? "ok" : "warn"}">${ok ? "Survey ✓" : "À faire"}</span></div>`));
-      if (s.lat != null && s.lon != null) {
-        const m = L.circleMarker([s.lat, s.lon], { radius: 8, color: ok ? "#fff" : "#c62828", weight: 2, fillColor: deptColor(s.dept), fillOpacity: ok ? .95 : .55 });
-        m.bindPopup(`<b>${esc(s.name)}</b><br>${esc(s.city || "")} · ${deptLabel(s.dept)} · ${esc(s.level || "—")}<br>${ok ? "✓ Survey disponible" : "⚠ Survey à faire"}${s.coord_source && /approx/.test(s.coord_source) ? "<br><i>position approximative (ville)</i>" : ""}<br><a href="#/station/${s.id}">Ouvrir la fiche →</a>`);
-        m.on("click", () => m.openPopup());
-        markersLayer.addLayer(m);
-      }
+      sl.appendChild(el(`<div class="srow" data-id="${s.id}"><span class="sdot ${ok ? "g" : "r"}"></span>
+        <div class="srow-main"><div class="sname">${esc(s.name)}${s.company ? `<span class="co-chip">${esc(s.company)}</span>` : ""}${s.pilot ? '<span class="co-chip" style="background:rgba(228,0,43,.25);color:#FFB3C0">Pilote</span>' : ""}</div>
+        <div class="smeta">${esc(s.city || "—")} · ${deptLabel(s.dept)}${s.grp === "blanches" ? " · blanche" : ""}</div></div>
+        <span class="spill ${ok ? "ok" : "no"}">${ok ? "SURVEY" : "À FAIRE"}</span><span class="lvl-sq">${esc(s.level || "—")}</span></div>`));
     });
-    sl.appendChild(el(`<div class="empty small">${list.length} station(s) affichée(s)</div>`));
+    if (!list.length) sl.appendChild(el('<div class="empty-side">Aucune station ne correspond aux filtres.</div>'));
+    $("#countLine").textContent = `${list.length} / ${stations.length}`;
     $$(".srow", sl).forEach(r => r.onclick = () => { location.hash = "#/station/" + r.dataset.id; });
   }
   refresh();
@@ -144,8 +211,8 @@ async function renderListe(view) {
   const stations = await loadStations();
   const rows = stations.filter(s => s.status === "active");
   view.innerHTML = `<div class="page">
-    <div class="row" style="margin-bottom:14px"><h1 style="font-size:22px">Toutes les stations <span class="muted" style="font-size:15px;font-weight:500">(${rows.length})</span></h1><div class="spacer" style="flex:1"></div>
-      ${can.edit() ? '<button class="btn" id="newSt">+ Nouvelle station</button>' : ""}<button class="btn" id="xls">⬇ Excel</button></div>
+    <div class="page-head"><div><div class="eyebrow">Réseau</div><h1 class="title">Toutes les stations<span class="n">${rows.length}</span></h1><div class="rule"></div></div><div class="grow"></div>
+      ${can.edit() ? '<button class="btn primary" id="newSt">+ Nouvelle station</button>' : ""}<button class="btn" id="xls">⬇ Excel</button></div>
     <div class="card"><table class="tbl"><thead><tr><th>#</th><th>Station</th><th>Ville</th><th>Département</th><th>Niveau</th><th>Type</th><th>Survey</th><th>Compagnie</th><th>Contact</th></tr></thead><tbody>
     ${rows.map((s, i) => `<tr><td>${i + 1}</td><td><a href="#/station/${s.id}"><b>${esc(s.name)}</b></a>${s.pilot ? ' <span class="pill brand">Pilote</span>' : ""}</td><td>${esc(s.city || "—")}</td><td><span class="pill" style="background:${deptColor(s.dept)}22;color:${deptColor(s.dept)}">${deptLabel(s.dept)}</span></td><td><span class="pill lvl">${esc(s.level || "—")}</span></td><td>${s.grp === "actives" ? "Active" : "Blanche"}</td><td>${isDone(s) ? '<span class="pill ok">✓ Fiche</span>' : '<span class="pill warn">À faire</span>'}</td><td>${esc(s.company || "—")}</td><td class="small">${esc(s.contact_name || "")}${s.contact_phone ? "<br>" + esc(s.contact_phone) : ""}</td></tr>`).join("")}
     </tbody></table></div></div>`;
@@ -182,11 +249,11 @@ async function renderAFaire(view) {
   for (const s of stations) {
     const g = s.pilot ? "Projet pilote" : deptLabel(s.dept);
     if (g !== lastGroup) { body += `<tr class="group"><td colspan="8">${esc(g)}</td></tr>`; lastGroup = g; }
-    const bg = s.pilot ? "#fff7cc" : deptColor(s.dept) + "14";
+    const bg = s.pilot ? "#FFF4E0" : deptColor(s.dept) + "12";
     body += `<tr style="background:${bg}"><td>${++i}</td><td><a href="#/station/${s.id}"><b>${esc(s.name)}</b></a></td><td>${esc(s.level || "—")}</td><td>${s.grp === "actives" ? "Active" : "Blanche"}</td><td>${deptLabel(s.dept)}</td><td>${esc(s.city || "—")}</td><td class="small">${esc(s.contact_name || "")}${s.contact_phone ? "<br>" + esc(s.contact_phone) : ""}</td><td class="small">${s.lat != null && s.coord_source === "gps" ? dms(s.lat, s.lon) : ""}${s.notes ? "<br>" + esc(s.notes) : ""}</td></tr>`;
   }
-  view.innerHTML = `<div class="page"><div class="row" style="margin-bottom:14px"><h1 style="font-size:22px">Surveys à faire <span class="muted" style="font-size:15px;font-weight:500">(${stations.length} stations)</span></h1><div style="flex:1"></div><button class="btn" id="xls">⬇ Excel</button><button class="btn" onclick="print()">🖨 Imprimer</button></div>
-    <p class="small muted">Cette liste se met à jour toute seule : une station disparaît dès qu'une fiche de survey lui est ajoutée. Jaune = projet pilote.</p>
+  view.innerHTML = `<div class="page"><div class="page-head"><div><div class="eyebrow">Rebranding</div><h1 class="title">Surveys à faire<span class="n">${stations.length} stations</span></h1><div class="rule"></div></div><div class="grow"></div><button class="btn" id="xls">⬇ Excel</button><button class="btn" onclick="print()">🖨 Imprimer</button></div>
+    <p class="small muted" style="margin:-6px 0 14px">Cette liste se met à jour toute seule : une station disparaît dès qu'une fiche de survey lui est ajoutée. Fond ambre = projet pilote.</p>
     <div class="card"><table class="tbl"><thead><tr><th>#</th><th>Station</th><th>Niveau</th><th>Type</th><th>Département</th><th>Ville</th><th>Contact</th><th>GPS / Note</th></tr></thead><tbody>${body || '<tr><td colspan="8" class="empty">Toutes les stations ont une fiche de survey 🎉</td></tr>'}</tbody></table></div></div>`;
   $("#xls").onclick = () => downloadXlsx("Surveys_a_faire.xlsx", [["Surveys à faire", [["N°", "Station", "Niveau", "Type", "Département", "Ville / Localité", "Contact", "Téléphone", "GPS", "Note"],
     ...stations.map((s, i) => [i + 1, s.name, s.level || "", s.grp === "actives" ? "Active" : "Blanche", s.pilot ? "Projet pilote — " + deptLabel(s.dept) : deptLabel(s.dept), s.city || "", s.contact_name || "", s.contact_phone || "", s.lat != null && s.coord_source === "gps" ? dms(s.lat, s.lon) : "", s.notes || ""])]]]);
@@ -195,7 +262,7 @@ async function renderAFaire(view) {
 // ---------------------------------------------------------------- mon compte
 function renderCompte(view) {
   const me = state.me;
-  view.innerHTML = `<div class="page" style="max-width:560px"><h1 style="font-size:22px;margin-bottom:14px">Mon compte</h1>
+  view.innerHTML = `<div class="page" style="max-width:560px"><div class="page-head"><div><div class="eyebrow">Utilisateur</div><h1 class="title">Mon compte</h1><div class="rule"></div></div></div>
     <div class="card"><div class="card-b">
       <div class="field"><label>E-mail</label><input value="${esc(me.email)}" disabled></div>
       <div class="field"><label>Nom affiché</label><input id="c_name" value="${esc(me.full_name || "")}"></div>

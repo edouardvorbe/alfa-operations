@@ -23,11 +23,11 @@ export async function renderStation(view, id) {
   const ap = s.approved;
   const edit = can.edit();
   view.innerHTML = `<div class="page">
-    <div class="st-head">
-      <div><div class="row"><span class="pill" style="background:${deptColor(s.dept)}22;color:${deptColor(s.dept)}">${deptLabel(s.dept)}</span><span class="pill lvl">Niveau ${esc(s.level || "—")}</span><span class="pill">${s.grp === "actives" ? "Station active" : "Station blanche"}</span>${s.pilot ? '<span class="pill brand">Projet pilote</span>' : ""}${s.status === "retiree" ? '<span class="pill bad">Retirée du projet</span>' : ""}</div>
-        <h1 style="margin-top:8px">${esc(s.name)}</h1>
-        <div class="meta">${esc(s.city || "Ville non renseignée")} · ${s.lat != null ? dms(s.lat, s.lon) + (s.coord_source && /approx/.test(s.coord_source) ? " (approximatif)" : "") : "GPS non renseigné"} · ID ${esc(s.id)}</div></div>
-      <div class="actions">${edit ? `<button class="btn" id="b_edit">✎ Modifier la station</button><button class="btn primary" id="b_fiche">+ Fiche de survey</button><button class="btn" id="b_doc">+ Photos / documents</button>` : ""}<a class="btn" href="#/">← Carte</a></div>
+    <div class="st-hero">
+      <div class="mh-badges"><span class="mh-badge">${deptLabel(s.dept)}</span><span class="mh-badge">Niveau ${esc(s.level || "—")}</span><span class="mh-badge">${s.grp === "actives" ? "Station active" : "Station blanche"}</span>${s.pilot ? '<span class="mh-badge red">Projet pilote</span>' : ""}${s.status === "retiree" ? '<span class="mh-badge" style="background:#7A1E12">Retirée du projet</span>' : ""}<span class="mh-badge ${fiches.length ? "ok" : "no"}">${fiches.length ? "✓ Survey disponible" : "Survey à faire"}</span></div>
+      <h1>${esc(s.name)}</h1>
+      <div class="meta">${esc(s.city || "Ville non renseignée")} · ${s.lat != null ? dms(s.lat, s.lon) + (s.coord_source && /approx/.test(s.coord_source) ? " (approximatif)" : "") : "GPS non renseigné"} · ID ${esc(s.id)}</div>
+      <div class="actions">${edit ? `<button class="btn primary" id="b_fiche">+ Fiche de survey</button><button class="btn" id="b_doc">+ Photos / documents</button><button class="btn" id="b_edit">✎ Modifier la station</button>` : ""}<a class="btn" href="#/">← Carte</a></div>
     </div>
     <div class="grid2">
       <div class="card"><div class="card-h">Informations<span class="grow"></span>${fiches.length ? '<span class="pill ok">Survey disponible</span>' : '<span class="pill warn">Survey à faire</span>'}</div>
@@ -40,21 +40,21 @@ export async function renderStation(view, id) {
           <div class="cell"><div class="k">Survey</div><div class="v">${esc(surveyLabel(s.survey_code))}</div></div>
           <div class="cell" style="grid-column:1/-1"><div class="k">Notes</div><div class="v" style="font-weight:500;white-space:pre-wrap">${esc(s.notes || "—")}</div></div>
         </div></div>
-      <div class="card"><div class="card-h">🏁 Branding approuvé — première vague</div>
+      <div class="card"><div class="card-h">Branding approuvé — première vague</div>
         ${ap ? `<div class="kv"><div class="cell"><div class="k">Marque cible</div><div class="v">${esc(ap.brand)}</div></div><div class="cell"><div class="k">Niveau approuvé</div><div class="v">${esc(ap.lvl)}</div></div><div class="cell"><div class="k">Type de canopée</div><div class="v">${esc(ap.canopy)}</div></div><div class="cell"><div class="k">Fabricant assigné</div><div class="v">${esc(ap.supplier === "NN" ? "Neon Nieto" : ap.supplier)}</div></div></div>` : '<div class="empty small">Station absente de la liste « Branding Approuvés » (première vague).</div>'}
         <div class="card-h" style="border-top:1px solid var(--line)">Historique récent</div>
         <div class="hist">${hist.length ? hist.slice(0, 8).map(h => `<div class="h"><b>${esc(actionLabel(h.action))}</b> ${esc(h.details?.summary || "")}<div class="when">${fmtDateTime(h.created_at)} · ${esc(h.user_email || "")}</div></div>`).join("") : '<div class="empty small">Aucune activité.</div>'}</div>
       </div>
     </div>
 
-    <h2 style="font-size:17px;margin:22px 0 10px">Photos, scans et documents <span class="muted small">(${docs.length})</span></h2>
+    <h2 class="h2sec">Photos, scans et documents <span class="muted">(${docs.length})</span></h2>
     <div class="card">
       ${images.length ? `<div class="gallery">${images.map(d => `<div class="g" data-id="${d.id}"><img src="${esc(urls[d.id] || "")}" alt="${esc(d.caption || d.file_name || "")}" loading="lazy"><div class="cap">${esc(d.caption || d.file_name || "")}</div>${edit ? `<button class="del" title="Supprimer" data-del="${d.id}">✕</button>` : ""}</div>`).join("")}</div>` : ""}
       ${files.length ? `<div class="doclist">${files.map(d => `<div class="d"><div class="ic">${/xls/.test(d.mime || d.file_name || "") ? "XLS" : "PDF"}</div><div class="grow"><div class="nm">${esc(d.caption || d.file_name)}</div><div class="small muted">${esc(d.file_name || "")} · ${fmtDate(d.created_at)}</div></div><a class="btn sm" target="_blank" rel="noopener" href="${esc(urls[d.id] || "#")}">Ouvrir</a>${edit ? `<button class="btn sm danger" data-del="${d.id}">Supprimer</button>` : ""}</div>`).join("")}</div>` : ""}
       ${!docs.length ? '<div class="empty">Aucun document pour cette station.</div>' : ""}
     </div>
 
-    <h2 style="font-size:17px;margin:22px 0 10px">Fiche de survey</h2>
+    <h2 class="h2sec">Fiche de survey</h2>
     ${fiches.length ? fiches.map(f => `<div class="card" style="margin-bottom:14px"><div class="card-h"><span>${esc(f.title || "Fiche de survey")}</span><span class="pill ${f.is_current ? "ok" : ""}">${f.is_current ? "En vigueur" : "Archivée"}</span><span class="grow"></span><span class="small muted" style="text-transform:none;letter-spacing:0">Source : ${esc(f.source_file || "—")} · ${fmtDate(f.source_date)}</span>${edit ? `<button class="btn sm" data-fedit="${f.id}">✎ Modifier</button><button class="btn sm danger" data-fdel="${f.id}">Supprimer</button>` : ""}</div><div class="card-b" style="padding:12px">${renderSections(f.sections)}</div></div>`).join("")
       : `<div class="card"><div class="empty">Aucune fiche de survey pour cette station.${edit ? "<br><br><button class='btn primary' id='b_fiche2'>+ Ajouter la fiche de survey</button>" : ""}</div></div>`}
   </div>`;

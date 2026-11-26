@@ -4,7 +4,7 @@ const CFG = window.APP_CONFIG;
 const ROLES = { admin: "Administrateur", editeur: "Éditeur", lecteur: "Lecteur" };
 
 export async function renderAdmin(view, tab = "users") {
-  view.innerHTML = `<div class="page"><h1 style="font-size:22px;margin-bottom:12px">Administration</h1>
+  view.innerHTML = `<div class="page"><div class="page-head"><div><div class="eyebrow">Alfa Operations</div><h1 class="title">Administration</h1><div class="rule"></div></div></div>
     <div class="tabs"><button data-t="users" class="${tab === "users" ? "active" : ""}">Utilisateurs</button><button data-t="journal" class="${tab === "journal" ? "active" : ""}">Journal d'activité</button><button data-t="import" class="${tab === "import" ? "active" : ""}">Données initiales</button></div>
     <div id="adminBody"></div></div>`;
   $$(".tabs button", view).forEach(b => b.onclick = () => renderAdmin(view, b.dataset.t));
