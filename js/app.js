@@ -52,7 +52,7 @@ function renderShell() {
   <main id="view"></main>`;
   $("#logout").onclick = async () => { await api.signOut(); state.me = null; document.body.classList.remove("on-map"); location.hash = "#/login"; };
   $("#burger").onclick = () => $("#nav").classList.toggle("open");
-  updateGauge();
+  if (state.stations) updateGauge(); else loadStations().catch(() => {});
 }
 function setActiveNav(path) {
   $$("#nav a").forEach(a => a.classList.toggle("active", a.dataset.r === "/" ? path === "/" : path.startsWith(a.dataset.r)));
