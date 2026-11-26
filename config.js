@@ -1,7 +1,8 @@
 // Configuration de l'application — à adapter avant la mise en ligne.
 window.APP_CONFIG = {
   appName: "Alfa Operations",
-  company: "Alfa Bandari Haïti",
+  company: "Alfa Énergie S.A.",
+  tagline: "Réseau stations · Suivi des surveys",
   // "supabase" en production ; "mock" = données d'essai locales (sans serveur)
   mode: "supabase",
   supabaseUrl: "https://svddbvfzipicnffceqeu.supabase.co",
